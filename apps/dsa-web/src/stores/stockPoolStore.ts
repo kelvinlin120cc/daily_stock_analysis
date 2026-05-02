@@ -74,7 +74,7 @@ export interface StockPoolState {
 const initialState = {
   query: '',
   selectionSource: 'manual' as SelectionSource,
-  notify: true,
+  notify: false,
   inputError: undefined,
   duplicateError: null,
   error: null,

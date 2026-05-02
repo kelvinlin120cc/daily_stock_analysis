@@ -241,18 +241,35 @@ const HomePage: React.FC = () => {
           </div>
 
           {sidebarOpen ? (
-            <div className="fixed inset-0 z-40 md:hidden" onClick={() => setSidebarOpen(false)}>
+            <div className="fixed inset-0 z-40 md:hidden touch-none" onClick={() => setSidebarOpen(false)}>
               <div className="page-drawer-overlay absolute inset-0" />
               <div
-                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col overflow-hidden !rounded-none !rounded-r-xl p-3 shadow-2xl"
+                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col !rounded-none !rounded-r-xl p-3 shadow-2xl h-screen overflow-hidden"
                 onClick={(event) => event.stopPropagation()}
               >
-                {sidebarContent}
+                <div className="flex flex-col min-h-0 h-full gap-3">
+                  <TaskPanel tasks={activeTasks} />
+                  <HistoryList
+                    items={historyItems}
+                    isLoading={isLoadingHistory}
+                    isLoadingMore={isLoadingMore}
+                    hasMore={hasMore}
+                    selectedId={selectedReport?.meta.id}
+                    selectedIds={selectedIds}
+                    isDeleting={isDeletingHistory}
+                    onItemClick={handleHistoryItemClick}
+                    onLoadMore={() => void loadMoreHistory()}
+                    onToggleItemSelection={toggleHistorySelection}
+                    onToggleSelectAll={toggleSelectAllVisible}
+                    onDeleteSelected={() => setShowDeleteConfirm(true)}
+                    className="flex-1 min-h-0 overflow-hidden"
+                  />
+                </div>
               </div>
             </div>
           ) : null}
 
-          <section className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto px-3 pb-4 md:px-6 touch-pan-y">
+          <section className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto px-3 pb-4 md:px-6">
             {error ? (
               <ApiErrorAlert
                 error={error}
