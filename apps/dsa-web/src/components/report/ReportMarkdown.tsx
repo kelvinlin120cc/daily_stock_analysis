@@ -8,6 +8,7 @@ import { Tooltip } from '../common/Tooltip';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface ReportMarkdownProps {
   recordId: number;
@@ -46,25 +47,21 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
   // Handle copy markdown source
   const handleCopyMarkdown = useCallback(async () => {
     if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
+    const ok = await copyToClipboard(content);
+    if (ok) {
       setCopiedType('markdown');
       setTimeout(() => setCopiedType(null), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
     }
   }, [content]);
 
   // Handle copy plain text
   const handleCopyPlainText = useCallback(async () => {
     if (!content) return;
-    try {
-      const plainText = markdownToPlainText(content);
-      await navigator.clipboard.writeText(plainText);
+    const plainText = markdownToPlainText(content);
+    const ok = await copyToClipboard(plainText);
+    if (ok) {
       setCopiedType('text');
       setTimeout(() => setCopiedType(null), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
     }
   }, [content]);
 

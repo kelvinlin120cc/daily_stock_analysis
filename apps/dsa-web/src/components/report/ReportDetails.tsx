@@ -4,6 +4,7 @@ import type { ReportDetails as ReportDetailsType, ReportLanguage } from '../../t
 import { Card } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface ReportDetailsProps {
   details?: ReportDetailsType;
@@ -47,27 +48,24 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
     return null;
   }
 
-  const copyToClipboard = async (content: string, panel: JsonPanel) => {
-    try {
-      await navigator.clipboard.writeText(content);
+  const doCopy = async (content: string, panel: JsonPanel) => {
+    const ok = await copyToClipboard(content);
+    if (!ok) return;
+    setCopiedPanels((prev) => ({
+      ...prev,
+      [panel]: true,
+    }));
+    const existingTimer = copyResetTimerRef.current[panel];
+    if (existingTimer !== undefined) {
+      window.clearTimeout(existingTimer);
+    }
+    copyResetTimerRef.current[panel] = window.setTimeout(() => {
       setCopiedPanels((prev) => ({
         ...prev,
-        [panel]: true,
+        [panel]: false,
       }));
-      const existingTimer = copyResetTimerRef.current[panel];
-      if (existingTimer !== undefined) {
-        window.clearTimeout(existingTimer);
-      }
-      copyResetTimerRef.current[panel] = window.setTimeout(() => {
-        setCopiedPanels((prev) => ({
-          ...prev,
-          [panel]: false,
-        }));
-        delete copyResetTimerRef.current[panel];
-      }, 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
+      delete copyResetTimerRef.current[panel];
+    }, 2000);
   };
 
   const renderJson = (data: unknown, panel: JsonPanel) => {
@@ -77,7 +75,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         <span className="absolute top-2 right-2 z-10 inline-flex">
           <button
             type="button"
-            onClick={() => copyToClipboard(jsonStr, panel)}
+            onClick={() => doCopy(jsonStr, panel)}
             className="home-accent-link text-xs text-muted-text"
             aria-label={copiedPanels[panel] ? text.copied : text.copy}
           >
