@@ -587,25 +587,54 @@ class HistoryService:
         ma_label = "Moving Averages" if report_language == "en" else "均线"
         volume_analysis_label = "Volume" if report_language == "en" else "量能"
         news_heading = "News Flow" if report_language == "en" else "消息面"
-
-        # Escape markdown special characters in stock name
-        name_escaped = self._escape_md(
-            get_localized_stock_name(result.name, result.code, report_language)
-        ) or result.code
+        dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
 
         # Get signal level
         signal_text, signal_emoji, signal_tag = self._get_signal_level(result)
-        dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
+        stock_name = self._escape_md(
+            get_localized_stock_name(result.name, result.code, report_language)
+        ) or result.code
 
+        # 统计信息 - 使用 decision_type 字段准确统计
+        decision_type = getattr(result, 'decision_type', 'hold')
+        if decision_type == 'buy':
+            buy_count, hold_count, sell_count = 1, 0, 0
+        elif decision_type == 'sell':
+            buy_count, hold_count, sell_count = 0, 0, 1
+        else:  # hold or empty
+            buy_count, hold_count, sell_count = 0, 1, 0
+            
         report_lines = [
-            f"# 📊 {name_escaped} ({result.code}) {labels['report_title']}",
+            f"# 🎯 {report_date} {labels['dashboard_title']}",
             "",
-            f"> {analysis_date_label}: **{report_date}** | {report_time_label}: {report_time}",
-            "",
-            "---",
+            f"> {labels['analyzed_prefix']} **1** {labels['stock_unit']} | "
+            f"🟢{labels['buy_label']}:{buy_count} 🟡{labels['watch_label']}:{hold_count} 🔴{labels['sell_label']}:{sell_count}",
             "",
         ]
 
+        # === 摘要部分 ===
+        report_lines.extend([
+            f"## 📊 {labels['summary_heading']}",
+            "",
+        ])
+        report_lines.append(
+            f"{signal_emoji} **{stock_name}({result.code})**: "
+            f"{localize_operation_advice(result.operation_advice, report_language)} | "
+            f"{labels['score_label']} {result.sentiment_score} | "
+            f"{localize_trend_prediction(result.trend_prediction, report_language)}"
+        )
+        report_lines.extend([
+            "",
+            "---",
+            "",
+        ])
+
+        # 添加股票标题
+        report_lines.extend([
+            f"## {signal_emoji} {stock_name} ({result.code})",
+            "",
+        ])
+        
         # ========== 舆情与基本面概览（放在最前面）==========
         intel = dashboard.get('intelligence', {}) if dashboard else {}
         if intel:
@@ -813,7 +842,7 @@ class HistoryService:
         report_lines.extend([
             "---",
             "",
-            f"*{labels['generated_at_label']}: {report_time}*",
+            f"*{labels['generated_at_label']}：{report_time}*",
         ])
 
         return "\n".join(report_lines)

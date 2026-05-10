@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
 import PortfolioPage from './pages/PortfolioPage';
+import SharePage from './pages/SharePage';
 import { ApiErrorAlert, Shell } from './components/common';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAgentChatStore } from './stores/agentChatStore';
@@ -47,11 +48,15 @@ const AppContent: React.FC = () => {
   }
 
   if (authEnabled && !loggedIn) {
-    if (location.pathname === '/login') {
+    // Allow /share/* routes to bypass auth
+    if (location.pathname.startsWith('/share/')) {
+      // Fall through to routes below
+    } else if (location.pathname === '/login') {
       return <LoginPage />;
+    } else {
+      const redirect = encodeURIComponent(location.pathname + location.search);
+      return <Navigate to={`/login?redirect=${redirect}`} replace />;
     }
-    const redirect = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
   if (location.pathname === '/login') {
@@ -60,6 +65,8 @@ const AppContent: React.FC = () => {
 
   return (
     <Routes>
+      {/* Share page — standalone, no Shell, no auth required */}
+      <Route path="/share/:recordId" element={<SharePage />} />
       <Route element={<Shell />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/chat" element={<ChatPage />} />

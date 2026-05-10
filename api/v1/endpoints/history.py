@@ -466,3 +466,38 @@ def get_history_markdown(
         )
 
     return MarkdownReportResponse(content=markdown_content)
+
+
+@router.get(
+    "/{record_id}/share-token",
+    include_in_schema=False,
+    summary="生成分享报告 Token",
+)
+def get_share_token(
+    record_id: str,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> dict:
+    """
+    为指定报告生成分享 Token（需要登录）。
+    生成的 Token 有效期默认 30 天。
+    """
+    # Import token generation from public module
+    from api.v1.endpoints.public import _create_share_token
+
+    service = HistoryService(db_manager)
+    record = service._resolve_record(record_id)
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "not_found", "message": "报告不存在"}
+        )
+
+    # Get the numeric record ID
+    try:
+        rid = int(record.id) if hasattr(record, 'id') else int(record_id)
+    except (ValueError, TypeError):
+        # If record_id is not numeric, try to use the id from the record
+        rid = int(getattr(record, 'id', 0))
+
+    token = _create_share_token(rid)
+    return {"token": token, "record_id": rid}

@@ -340,10 +340,14 @@ class AkshareFundamentalAdapter:
                 result["source_chain"].append(f"growth:{fin_source}")
 
         # Earnings forecast
+        # Note: stock_yjyg_em/stock_yjbb_em take 'date' param, not 'symbol'
+        # They return all stocks' data, which we then filter by code
+        from datetime import datetime
+        current_date = datetime.now().strftime("%Y%m%d")
         forecast_df, forecast_source, forecast_errors = self._call_df_candidates([
-            ("stock_yjyg_em", {"symbol": stock_code}),
+            ("stock_yjyg_em", {"date": current_date}),
             ("stock_yjyg_em", {}),
-            ("stock_yjbb_em", {"symbol": stock_code}),
+            ("stock_yjbb_em", {"date": current_date}),
             ("stock_yjbb_em", {}),
         ])
         result["errors"].extend(forecast_errors)
@@ -356,8 +360,9 @@ class AkshareFundamentalAdapter:
                 result["source_chain"].append(f"earnings_forecast:{forecast_source}")
 
         # Earnings quick report
+        # Note: stock_yjkb_em takes 'date' param, not 'symbol'
         quick_df, quick_source, quick_errors = self._call_df_candidates([
-            ("stock_yjkb_em", {"symbol": stock_code}),
+            ("stock_yjkb_em", {"date": current_date}),
             ("stock_yjkb_em", {}),
         ])
         result["errors"].extend(quick_errors)

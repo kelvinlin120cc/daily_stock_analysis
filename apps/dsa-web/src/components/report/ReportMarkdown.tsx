@@ -16,6 +16,14 @@ interface ReportMarkdownProps {
   stockCode: string;
   onClose: () => void;
   reportLanguage?: ReportLanguage;
+  /**
+   * When true, render as a standalone full-page view:
+   * no close button, no backdrop click-to-close,
+   * no Escape-to-close, and fetch markdown via public API.
+   */
+  standalone?: boolean;
+  /** Preloaded markdown content (skips fetch when provided). */
+  markdownContent?: string;
 }
 
 /**
@@ -28,6 +36,8 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
   stockCode,
   onClose,
   reportLanguage = 'zh',
+  standalone = false,
+  markdownContent: preloadedContent,
 }) => {
   const text = getReportText(normalizeReportLanguage(reportLanguage));
   const loadReportFailedText = text.loadReportFailed;
@@ -36,13 +46,54 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(true);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
 
-  // Handle close with animation
+  // In standalone mode, fetch markdown content via public API
+  const shareToken = standalone ? new URLSearchParams(window.location.search).get('token') ?? '' : '';
+
+  // Handle share link copy
+  const handleShare = useCallback(() => {
+    const origin = window.location.origin;
+    if (standalone && shareToken) {
+      // Already have token in standalone mode
+      const url = `${origin}/share/${recordId}?token=${shareToken}`;
+      void copyToClipboard(url).then(ok => {
+        if (ok) {
+          setShareLinkCopied(true);
+          setTimeout(() => setShareLinkCopied(false), 2000);
+        }
+      }).catch(() => {
+        // Silent fail — user can retry
+      });
+    } else {
+      // Fetch share token from the history API (requires auth)
+      void fetch(`/api/v1/history/${recordId}/share-token`)
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to generate share link');
+          return res.json();
+        })
+        .then(data => {
+          const url = `${origin}/share/${data.record_id}?token=${data.token}`;
+          return copyToClipboard(url).then(ok => {
+            if (ok) {
+              setShareLinkCopied(true);
+              setTimeout(() => setShareLinkCopied(false), 2000);
+            }
+          });
+        })
+        .catch(() => {
+          // Silent fail — user can retry
+        });
+    }
+  }, [recordId, standalone, shareToken]);
+
+  // Handle close with animation (no-op in standalone mode)
   const handleClose = useCallback(() => {
+    if (standalone) return;
     setIsOpen(false);
     // Delay actual close to allow animation to complete
     setTimeout(onClose, 300);
-  }, [onClose]);
+  }, [onClose, standalone]);
 
   // Handle copy markdown source
   const handleCopyMarkdown = useCallback(async () => {
@@ -69,10 +120,27 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
     let isMounted = true;
 
     const fetchMarkdown = async () => {
+      // If content is preloaded, skip fetch
+      if (preloadedContent) {
+        setContent(preloadedContent);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
-        const markdownContent = await historyApi.getMarkdown(recordId);
+        let markdownContent: string;
+        if (standalone && shareToken) {
+          // Fetch via public API in standalone/share mode
+          const res = await fetch(`/api/v1/public/report/${recordId}/data?token=${encodeURIComponent(shareToken)}`);
+          if (!res.ok) throw new Error(loadReportFailedText);
+          const data = await res.json();
+          markdownContent = data.markdown_content;
+        } else {
+          // Fetch via authenticated API in normal mode
+          markdownContent = await historyApi.getMarkdown(recordId);
+        }
         if (isMounted) {
           setContent(markdownContent);
         }
@@ -92,15 +160,17 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [recordId, loadReportFailedText]);
+  }, [recordId, loadReportFailedText, standalone, shareToken, preloadedContent]);
 
   return (
     <Drawer
       isOpen={isOpen}
       onClose={handleClose}
-      width="max-w-3xl"
+      width={standalone ? 'full' : 'max-w-3xl'}
       zIndex={100}
       backdropClassName="bg-background/56 backdrop-blur-[2px]"
+      disableClose={standalone}
+      hideCloseButton={standalone}
     >
       {/* Custom Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -119,6 +189,29 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
 
         {/* Right: Toolbar */}
         <div className="flex items-center gap-2">
+          {/* Share link button */}
+          <Tooltip content="复制分享链接">
+            <span className="inline-flex">
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={isLoading || !content || shareLinkCopied}
+                className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                aria-label="复制分享链接"
+              >
+                {shareLinkCopied ? (
+                  <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                )}
+              </button>
+            </span>
+          </Tooltip>
+
           {/* Copy Markdown button */}
           <Tooltip content={text.copyMarkdownSource}>
             <span className="inline-flex">
@@ -181,13 +274,15 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
             </svg>
           </div>
           <p className="text-danger text-sm">{error}</p>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
-          >
-            {text.dismiss}
-          </button>
+          {!standalone ? (
+            <button
+              type="button"
+              onClick={handleClose}
+              className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
+            >
+              {text.dismiss}
+            </button>
+          ) : null}
         </div>
       ) : (
         <div
@@ -214,16 +309,18 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
         </div>
       )}
 
-      {/* Footer */}
-      <div className="home-divider mt-6 flex justify-end border-t pt-4">
-        <button
-          type="button"
-          onClick={handleClose}
-          className="home-surface-button rounded-lg px-4 py-2 text-sm text-secondary-text hover:text-foreground"
-        >
-          {text.dismiss}
-        </button>
-      </div>
+      {/* Footer — hidden in standalone mode */}
+      {!standalone ? (
+        <div className="home-divider mt-6 flex justify-end border-t pt-4">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="home-surface-button rounded-lg px-4 py-2 text-sm text-secondary-text hover:text-foreground"
+          >
+            {text.dismiss}
+          </button>
+        </div>
+      ) : null}
     </Drawer>
   );
 };

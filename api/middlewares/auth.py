@@ -26,11 +26,17 @@ EXEMPT_PATHS = frozenset({
     "/openapi.json",
 })
 
+# Path prefixes exempt from auth (e.g. public share links)
+EXEMPT_PREFIXES = ("/public/", "/api/v1/public/")
+
 
 def _path_exempt(path: str) -> bool:
     """Check if path is exempt from auth."""
     normalized = path.rstrip("/") or "/"
-    return normalized in EXEMPT_PATHS
+    if normalized in EXEMPT_PATHS:
+        return True
+    # Check exempt prefixes (for public share links)
+    return normalized.startswith(EXEMPT_PREFIXES)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

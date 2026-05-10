@@ -49,6 +49,8 @@ const REPORT_TEXT = {
     laggingBoard: '领跌',
     neutralBoard: '中性',
     reanalyze: '重新分析',
+    shareLink: '复制分享链接',
+    shareLinkCopied: '分享链接已复制',
   },
   en: {
     keyInsights: 'KEY INSIGHTS',
@@ -95,6 +97,8 @@ const REPORT_TEXT = {
     laggingBoard: 'Lagging',
     neutralBoard: 'Neutral',
     reanalyze: 'Reanalyze',
+    shareLink: 'Copy Share Link',
+    shareLinkCopied: 'Share link copied!',
   },
 } as const;
 
