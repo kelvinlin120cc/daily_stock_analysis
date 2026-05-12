@@ -950,7 +950,7 @@ class AkshareFetcher(BaseFetcher):
             )
             
             self._enforce_rate_limit()
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10, proxies={})
             response.encoding = 'gbk'
             api_elapsed = time.time() - api_start
             
@@ -1101,7 +1101,7 @@ class AkshareFetcher(BaseFetcher):
             )
             
             self._enforce_rate_limit()
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10, proxies={})
             response.encoding = 'gbk'
             api_elapsed = time.time() - api_start
             

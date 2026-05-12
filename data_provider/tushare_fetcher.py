@@ -79,6 +79,21 @@ class _TushareHttpClient:
         self._token = token
         self._timeout = timeout
         self._api_url = api_url
+        # 预解析域名到 IP，避免 DNS 解析问题
+        self._resolved_ip = self._resolve_host()
+
+    def _resolve_host(self) -> Optional[str]:
+        """解析 API 域名到 IP 地址，避免 DNS 解析问题"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(self._api_url)
+            import socket
+            ip = socket.gethostbyname(parsed.hostname)
+            logger.debug(f"Tushare API 域名解析: {parsed.hostname} -> {ip}")
+            return ip
+        except Exception as e:
+            logger.warning(f"Tushare API 域名解析失败: {e}")
+            return None
 
     def query(self, api_name: str, fields: str = "", **kwargs) -> pd.DataFrame:
         req_params = {
@@ -87,7 +102,19 @@ class _TushareHttpClient:
             "params": kwargs,
             "fields": fields,
         }
-        res = requests.post(self._api_url, json=req_params, timeout=self._timeout)
+        
+        # 优先使用解析后的 IP 地址连接，避免 DNS 解析问题
+        if self._resolved_ip:
+            from urllib.parse import urlparse
+            parsed = urlparse(self._api_url)
+            # 使用 IP 地址直接连接，通过 Host header 指定域名
+            url_with_ip = f"{parsed.scheme}://{self._resolved_ip}{parsed.path}"
+            headers = {"Host": parsed.hostname}
+            # 绕过代理直接连接 Tushare API
+            res = requests.post(url_with_ip, json=req_params, timeout=self._timeout, proxies={}, headers=headers)
+        else:
+            # 回退到原始域名连接
+            res = requests.post(self._api_url, json=req_params, timeout=self._timeout, proxies={})
         if res.status_code != 200:
             raise Exception(f"Tushare API HTTP {res.status_code}")
 
